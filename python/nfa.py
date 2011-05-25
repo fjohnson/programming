@@ -2,12 +2,11 @@
 
 '''
 This is an implementation in python of the algorithm described
-from http://swtch.com/~rsc/regexp/regexp1.html. Its not complete yet
-or rather I forget what is missing that makes it incomplete.
-Probably the on the fly DFA conversion.
+from http://swtch.com/~rsc/regexp/regexp1.html. 
 More over see: http://swtch.com/~rsc/regexp/nfa.c.txt
 
-Date:Feb-May? 2011
+Date:Feb-May? 2011 
+Date2: May 24th 2011. Added DFA construction and cleaned up the code.
 Author: Fletcher Johnson
 Email: flt.johnson@gmail.com
 '''
@@ -15,6 +14,8 @@ Email: flt.johnson@gmail.com
 import sys
 
 def re2post(re):
+    '''Convert a regular expression into postfix form. The regular
+expression can only support the special symbols #()*|?+'''
     #()*|?+
     parens = []
     natoms = 0
@@ -62,118 +63,209 @@ def re2post(re):
     return reduce(lambda x,y: x+y, dst, '')
 
 def post2nfa(postre):
+    '''Create a NFA from a postfix regular expression'''
+
     fragstack = []
     class state:
-        def __init__(self,c,out=None,out1=None):
+        def __init__(self,c):
             self.c = c
-            if not out: self.out = self
-            else: self.out = out
-            self.out1 = out1
+            self.out = None
+            self.out1 = None
+            #for patch, if state is a split then join out1 with new state 
+            #otherwise join out.
+
     class frag:
-        def __init__(self,start,out=None):
+        '''A "fragment" of computation'''
+
+        def __init__(self,start,dangling_states):
             self.start = start
-            if not out: self.out = start
-            else: self.out = out
+            self.out = dangling_states
+            #out is a list of states with dangling arrows.
 
     for c in postre:
         if c == '.':
             f2 = fragstack.pop()
             f1 = fragstack.pop()
             patch(f1.out,f2.start)
-            fragstack.append(frag(f1.start,f2.out))
+            f1.out = f2.out
+            fragstack.append(f1)
+        
         elif c == '?':
-            lastfrag = fragstack.pop()
-            zoostate= state(-1,out1=lastfrag.start)
-            nextfrag = frag(zoostate,lastfrag.out)
-            link(lastfrag.out,zoostate)
-            fragstack.append(nextfrag)
+            f = fragstack.pop()
+            zoostate = state(-1)
+            zoostate.out = f.start
+            f.out.append(zoostate)
+            f.start = zoostate
+            fragstack.append(f)
+
         elif c == '*':
-            lastfrag = fragstack.pop()
-            zomstate = state(-1,out1=lastfrag.start)
-            nextfrag = frag(zomstate,zomstate)
-            patch(lastfrag.out,zomstate)
-            fragstack.append(nextfrag)
+            f = fragstack.pop()
+            zomstate = state(-1)
+            zomstate.out = f.start
+            patch(f.out,zomstate)
+            f.out = [zomstate]
+            f.start = zomstate
+            fragstack.append(f)
+
         elif c == '+':
-            lastfrag = fragstack.pop()
-            ormstate = state(-1,out1=lastfrag.start)
-            nextfrag = frag(lastfrag.start,ormstate)
-            patch(lastfrag.out,ormstate)
-            fragstack.append(nextfrag)
+            f = fragstack.pop()
+            ormstate = state(-1)
+            ormstate.out = f.start
+            patch(f.out,ormstate)
+            f.out = [ormstate]
+            fragstack.append(f)
+            
         elif c == '|':
             f2 = fragstack.pop()
             f1 = fragstack.pop()
-            orstate = state(-1,f1.start,f2.start)
-            link(f1.out,f2.out)
-            fragstack.append(frag(orstate,f1.out))
+            orstate = state(-1)
+            orstate.out = f2.start
+            orstate.out1 = f1.start
+            f1.start = orstate
+            f1.out = f1.out + f2.out
+            fragstack.append(f1)
+
         else:
-            fragstack.append(frag(state(c)))
-    
-    if fragstack:
-        f1 = fragstack.pop()
-        patch(f1.out,state(-2))
-        return f1.start
+            atom_state = state(c)
+            f = frag(atom_state,[atom_state])
+            fragstack.append(f)
+
+    if fragstack: 
+        f = fragstack.pop()
+        patch(f.out, state(-2))
+        return f.start
     return state(-2)
 
-def link(state,exit_state):
-    while state.out != state: state = state.out
-    state.out = exit_state
+def patch(dangling_states, output):
+    '''Connect the dangling output of nodes to an actual output'''
 
-def patch(state,exit_state):
+    for state in dangling_states:
+        if state.c == -1: state.out1 = output
+        else: state.out = output;
 
-    while True:
-        if state.out == state:
-                state.out = exit_state
-                break
-        temp = state.out
-        state.out = exit_state
-        state = temp
+#A set that maintains the list of visited nodes while computing 
+#the epsilon closure.
+__visited_state_set = set() 
 
-def epsilonclosure(state,cstates):
-    if state.c == -1: #split type state (?+|*)
-        epsilonclosure(state.out,cstates)
-        epsilonclosure(state.out1,cstates)
-    else: cstates.add(state)
+#A set used to hold the epsilon closure result.
+__eclosure_result_set = set()
+
+def epsilonclosure(states):
+    ''' Return a new set of states which is the result of performing the
+epsilon closure on the input set of states'''
+
+    __eclosure_result_set.clear()
+    __visited_state_set.clear()
+    map(__epsilonclosure, states)
+    return __eclosure_result_set
+
+def __epsilonclosure(state):
+    ''' Private epsilon closure worker method '''
+
+    if state.c == -1 and state not in __visited_state_set: #split type state (?+|*)
+
+        #To avoid infinite loops make sure we don't recurse on a node 
+        #already visited. The pattern a?* is an example of a scenario 
+        #where a circular reference is created between the ? and * node.
+        __visited_state_set.add(state) 
+
+        __epsilonclosure(state.out)
+        __epsilonclosure(state.out1)
+    else: __eclosure_result_set.add(state)
+
+#A set to hold the resulting set of states after transitioning on the input
+#symbol (post epsilon closure)
+__next_states_result_set = set()
 
 def step(startstates,inputc):
+    ''' Return a new set of states, the result of which is derived from 
+transitioning on the input states with the input symbol'''
+
     #Step instructions:
     #Compute the closure for each state reachable from the start list
     #but do not add duplicate states. For those steps that do not match
     #the step char, abandon them. For those that do, add their output 
     #to the list.
-
-    eclosure = set()
-    for state in startstates:
-        epsilonclosure(state,eclosure)
-
-    startstates.clear()
-    for state in eclosure:
-        if state.c == inputc: startstates.add(state.out)
     
+    eclosure = epsilonclosure(startstates)
+
+    __next_states_result_set.clear()
+    for state in eclosure:
+        if state.c == inputc: __next_states_result_set.add(state.out)
+    return __next_states_result_set
+
 def simulate(machine,input):
+    '''Simulate an NFA constructed from a postfix notation regular expression'''
 
-    #TODO: Do the epsilon closure first. Then in step do the closure after
-    #Stepping on an epsilon closed list. This makes more sense when we switch
-    #to using the dfa construct.
-
-    cstate = set([machine])
-    for c in input: step(cstate,c)
+    cstate = set([machine]) #current state
+    for c in input: cstate = step(cstate,c)
 
     #Calculate the closure one last time since it is done only on the
     #start of an input. See step.
-    
-    finalstates = set()
-    for state in cstate:
-        epsilonclosure(state,finalstates)
-    
     #Check that there is at least one matching state.
-    if finalstates: 
-        for state in finalstates: 
-            if state.c == -2: return True
-    return False
+    return not not filter(lambda state: state.c == -2, epsilonclosure(cstate))
 
-result = re2post(sys.argv[1])
-print 'Out: %s' % result
-machine = post2nfa(result)
-print 'Match: %s' % simulate(machine,sys.argv[2])
 
+class __dfa_state:
+    '''A class representing a dfa state'''
+
+    def __init__(self,states):
+
+        #A set of NFA states. Really, a set of states in a NFA
+        #that this single DFA state represents. You can think of a
+        #set of NFA states as a single DFA state, where all the
+        #reachable states from the NFA states for an input char
+        #represent a new DFA state (the next DFA state)
+        
+        self.states = states
+        
+        #A map from input character to next dfa.
+        self.next = {}
+        
+def dfa_state_lookup(dfa_state_list,state_set):
+    '''Search for a cached dfa state that has the same set of states 
+as the input set'''
+
+    for dfastate in dfa_state_list:
+        if dfastate.states == state_set: 
+            print "\ndfa cache hit"
+            return dfastate
+    
+    #Make a copy here since state_set is a global variable used for
+    #calculations of states. Its function is to promote object reuse.
+    new_dfa_state = __dfa_state(state_set.copy())
+
+    dfa_state_list.add(new_dfa_state)
+    return new_dfa_state
+
+def dfasimulate(machine,input):
+    '''Simulate a DFA machine, converting it from an NFA on the fly'''
+
+    dfa_state_list = set()
+    cstate = __dfa_state(set([machine]))
+    dfa_state_list.add(cstate)
+
+    for c in input: 
+        if c not in cstate.next:
+            nstate = dfa_state_lookup(dfa_state_list, 
+                                      step(cstate.states,c))
+
+            #Zero states were reachable from the current position for the latest
+            #input character so for efficiency break and return a negative match
+            if len(nstate.states) == 0: return False
+
+            cstate.next[c] = nstate
+        cstate = cstate.next[c]
+
+    #Calculate the closure one last time and check that there is 
+    #at least one matching state.
+    return not not filter(lambda state: state.c == -2, 
+                          epsilonclosure(cstate.states))
+
+if __name__ == '__main__':
+    result = re2post(sys.argv[1])
+    print 'Out: %s' % result
+    machine = post2nfa(result)
+    print 'Match: %s' % simulate(machine,sys.argv[2])
+    print 'Match: %s' % dfasimulate(machine,sys.argv[2])
 
