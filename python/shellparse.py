@@ -1,3 +1,6 @@
+import sys
+from subprocess import Popen, PIPE
+
 class commandError(Exception): 
   '''Denotes a syntax error in shell command'''
   def __init__(self, message):
@@ -18,17 +21,11 @@ class commandError(Exception):
                              
 def parseCommand(command):
   pipelines = filter(lambda x : x, command.split(';'))
-  for pl in pipelines: parsePipeline(pl)
-
-def parsePipeline(pipeline):
-  result = pipeline.split('<')
-  if len(result) == 1:
-      parsePipelineNoIn(pipeline)
-  elif len(result) == 2:
-      #do call
-      pass
-  else:
-      raise commandError("BAD <")
+  pipe_retcode = None
+  for pl in pipelines: 
+    commands = parsePipeline(pl)
+    pipe_retcode = chainCommands(commands)
+  if pipe_retcode != None: return pipe_retcode
 
 def getRestrictedTokens():
   restricted = ['<','2&>','>', '&'] #order matters here.
@@ -64,6 +61,7 @@ def executeCommand(command, pipe=None, newpipe=False):
   if newpipe: sout = PIPE
   else: sout = sys.stdout
 
+  
   if '2&>' in controlcs:
     outfile = open(args.pop(),'w')
     p = Popen(args, stdin = pipe, stdout = outfile, stderr = outfile)
@@ -77,8 +75,7 @@ def executeCommand(command, pipe=None, newpipe=False):
     p = Popen(args, stdin = pipe, stdout = sout, stderr = err)
 
   if newpipe:
-    p.stdout.close()
-    return p.stdout
+   return p
 
   if '&' in controlcs:
     return p.wait()
@@ -90,16 +87,65 @@ def chainCommands(parsedCommands):
     looking at the seen control characters should immediately
     indicate how to do the linking. i.e if seen controls is empty of
     redirections then chainging is done with a pipe'''
-
-    ncommands = len(parsedCommands)
+    print parsedCommands
+    n = len(parsedCommands)
     pipe = None
     for i,p in enumerate(parsedCommands):
       #Don't create a new pipe. Last command in the chain.
-      if i == n - 1:  return executeCommand(pipe)
-      else: pipe = executeCommand(pipe, newpipe=True)
+      if i == n - 1:  
+        ret = executeCommand(p, pipe)
         
+        #close reading side of pipe so writer of the pipe
+        #can get a SIGPIPE if this process ends before it is
+        #finished.
+        if pipe: pipe.close() 
+      else: 
+        p = executeCommand(p, pipe, newpipe=True)
+        if pipe: pipe.close()
+        pipe = p.stdout
+        
+def tokenizeCommand(command):
+  '''Split a command up extracting its tokens.
+  Tokens are delimited by spaces quoting spaces or escaping them is
+  allowed. only \' quotes are supported.
+  Return the tokens in a list, just like str.split()
+  '''
+
+  #print command
+  tokens = []
+  escaped = False
+  quoted = False 
+  currentToken = []
+
+  for c in command:
+    if quoted:
+      if c == "'": 
+        quoted = False
+        continue
+      currentToken.append(c)
+      continue
+    elif escaped: 
+      escaped = False
+      currentToken.append(c)
+      continue
+
+    if c == '\\':escaped = True
+    elif c == "'": quoted = True
+    elif c == ' ': #split tokens on spc 
+      if currentToken: #don't add empty tokens.
+        tokens.append(''.join(currentToken))
+        currentToken = []
+    else: currentToken.append(c)
+
+  if quoted or escaped: #end quote or lone escape
+    raise commandError("Bad command %s command\n"+
+                       "Lone escape or missing end quote.\n")
+  if currentToken: #command had token not ending in a space.
+    tokens.append(''.join(currentToken))
+  return tokens
     
-def parsePipelineNoIn(pipeline):
+
+def parsePipeline(pipeline):
     pipeline = pipeline.strip()
     
     if pipeline[-1] == '&':
@@ -114,7 +160,7 @@ def parsePipelineNoIn(pipeline):
         seenControls = []
 
         args = []
-        tokens = command.split()
+        tokens = tokenizeCommand(command)
         for i,arg in enumerate(tokens):
             isControl = checkControl(arg)
             #executable was a control character!
