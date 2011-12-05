@@ -1,0 +1,28 @@
+#All primitive data types are signed. 
+#A _byte_ is a signed 8 bit quantity with range -128 to 127.
+#A char is a 16 bit unicode character with range 0 to 65,535.
+#In java 7 number literals can be defined with '_' as a delimiter between numbers
+for example... 0xDEAD_BEEF or 0b1001_1101; binary literals only exist in java 7.
+#fields are either class instance variables or static class variables. local 
+vars and parameters to methods are not fields. fields are initialized with
+a default value while local vars are never given default values.
+#overloaded methods are separated based on the parameter list. the return type
+is not considered so you cannot declare two methods but with different return
+types. 
+#decimal literals default as doubles. So a literal '3.0' is a double and not
+a float. 
+#A class with no constructors is provided with a default no argument constructor
+by the compiler. This constructor will call the super class' no argument 
+constructor so you must be careful that one exists.
+#Doing a static import of an overloaded method will import all versions of
+that overloaded method. 
+#Imports cannot be done for classes in the default package. Static imports
+cannot be done either. This is because an import statement is of the form:
+import package.path.path.class. The default package cannot be equalified.
+#If a constructor does not explicitly call its super's constructor then
+the super's no arg constructor is called by default. This no arg must exist
+or an error will occur.
+#A super class' constructor evocation must always be the very first 
+statement found in a child's constructor.
+#static code blocks are executed in the order that they are found when a class
+is first loaded. Instance code blocks are copied into every constructor.  
