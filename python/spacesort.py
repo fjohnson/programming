@@ -127,10 +127,6 @@ def printout():
     sizes = readin() #Order input by size then lex order
     map = map_dirname_to_children(sizes)
     showorder(map,sizes)
-   
-printout()
-
-
 
 def test():
     s = [('10G','/h/f\n'),
@@ -154,6 +150,8 @@ def test():
     map = map_dirname_to_children(s)
     print map
     showorder(map,s)
-    
+
+if __name__ == '__main__':
+    printout()    
 #test()
 
