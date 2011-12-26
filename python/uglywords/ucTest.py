@@ -34,7 +34,7 @@ class UCTest(unittest.TestCase):
         unicodestr=u'チムブレ 中国话不用彁字 4.57'
         result = uc.regex_word_search(unicodestr)
         got = result
-        expected = [u'チムブレ', u'中国话不用彁字', '4', '57']
+        expected = [u'チムブレ', u'中国话不用彁字', u'4', u'57']
         self.checkEqual(got,expected)
 
     
@@ -115,6 +115,15 @@ class UCTest(unittest.TestCase):
             idx = w.find('-')
             if not uc.processHyphenatedToken(w,idx,wordset):
                 self.assertTrue(False,"Token %s not in wordset" % w) 
+
+    def testGroupAdjacentCapitalizedWordsAsSingleName(self):
+        '''Test dictionary lookup of words composed of two 
+        or more adjacent capitalized words. For example, New York should be
+        looked up as "New York" and not the two separate words "New" and "York"'''
+        s = "Once in Hong Kong and New   York, Sable rode."
+        got = uc.regex_word_search(s)
+        expected = ['once','in','hong kong','and','new   york', 'sable','rode']
+        self.checkEqual(got,expected)
 
     def checkEqual(self,got,expected):
         self.assertEqual(got, expected, 

@@ -83,13 +83,58 @@ def processHyphenatedToken(ht,firstIdx,wordlist):
       if not word_in_dictionary(token,wordlist): return False
   return True   
 
+def regex_word_search_help(text):
+
+  match = None
+  match = WORD_PAT.search(text)
+  if not match: return []
+  
+  result_set = [match.group(0)]
+  matchidx = [(match.start(),match.end())]
+  while match:
+    match = WORD_PAT.search(text,match.end())
+    if match:
+        matchidx.append( (match.start(),match.end()) )
+        result_set.append(match.group(0))
+  return result_set,matchidx
+
 def regex_word_search(text):
-    result_set = WORD_PAT.findall(text)
+        
+    #result_set = WORD_PAT.findall(text)
+    result_set,matchidx = regex_word_search_help(text)
     
     #Normalize text here.
     #p.s it might be useful to take a look at the unicodedata module,
     #specifically the normalize() function.
     
+    #create a new set but with adjacent upper case words treated as a single
+    #word. So "new york" while in the original set is represented as two words
+    #new and york, this transform the two into a single word "new york".
+
+    lastword = None
+    lastidx = None
+    new_set = []
+    for word,matchidx in zip(result_set,matchidx):
+      if word[0].isupper():
+        if lastword:
+          seperation = text[lastidx[1]:matchidx[0]]
+          if seperation.isspace():
+            lastword = lastword + seperation + word
+            lastidx = matchidx
+          else:
+            new_set.append(lastword)
+            new_set.append(word)
+            lastword = None
+        else: 
+          lastword = word
+          lastidx = matchidx
+      else:
+        if lastword: 
+          new_set.append(lastword)
+          lastword = None
+        new_set.append(word)
+    if lastword: new_set.append(lastword)
+    result_set = new_set
 
     def normalize_text(word):
         '''turn words to lowercase, convert apostrophes'''
