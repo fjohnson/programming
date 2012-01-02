@@ -26,7 +26,7 @@ class UCTest(unittest.TestCase):
         sentence = "here laYeth 4.51"
         result = uc.regex_word_search(sentence)
         got = set(result)
-        expected = set(['here', 'layeth', '4', '51'])
+        expected = set(['here', 'laYeth', '4', '51'])
         self.checkEqual(got,expected)
 
 
@@ -43,15 +43,15 @@ class UCTest(unittest.TestCase):
     def testPunctuated_sentence(self):
         s = ("So that's the straight dope: She hit him, he ran; a \"clear\""
              + " case of hit and run!")
-        expected = ['so', "that's", "the", "straight", "dope",
-                    "she", "hit", "him", "he", "ran", "a", 'clear',
+        expected = ['So', "that", "the", "straight", "dope",
+                    "She", "hit", "him", "he", "ran", "a", 'clear',
                     "case", "of", "hit", "and", "run"]
         got = uc.regex_word_search(s)
         self.checkEqual(got,expected)
 
     def testExtra_Punctuation(self):
         s = "[Ever] wonder 100% & gather $100 ~ {filthy} [greens?] <hobby>"
-        expected = ['ever', 'wonder', '100', 'gather', '100',
+        expected = ['Ever', 'wonder', '100', 'gather', '100',
                     'filthy', 'greens', 'hobby']
         got = uc.regex_word_search(s)
         self.checkEqual(got,expected)
@@ -90,8 +90,8 @@ class UCTest(unittest.TestCase):
         self.checkEqual(got,expected)
 
     def testUnicode_Punctuation2(self):
-        got = uc.regex_word_search(u"hamstrung’s")
-        expected = ["hamstrung's"]
+        got = uc.regex_word_search(u"hamstrung’re")
+        expected = ["hamstrung're"]
         self.checkEqual(got,expected)
 
     def testQuotes(self):
@@ -102,8 +102,8 @@ class UCTest(unittest.TestCase):
 
     def testHyphenWords(self):
         '''Test the effective capture of hyphenated words'''
-        got = uc.regex_word_search("a-b-c;ab-c's;anti-flag;strong-bad-fun")
-        expected = ['a-b-c', "ab-c's", 'anti-flag', 'strong-bad-fun']
+        got = uc.regex_word_search("a-b-c;ab-c're;anti-flag;strong-bad-fun")
+        expected = ['a-b-c', "ab-c're", 'anti-flag', 'strong-bad-fun']
         self.checkEqual(got,expected)
 
     def testProcessingHyphenatedToken(self):
@@ -122,8 +122,38 @@ class UCTest(unittest.TestCase):
         looked up as "New York" and not the two separate words "New" and "York"'''
         s = "Once in Hong Kong and New   York, Sable rode."
         got = uc.regex_word_search(s)
-        expected = ['once','in','hong kong','and','new   york', 'sable','rode']
+        expected = ['Once','in','Hong Kong and New   York', 'Sable','rode']
         self.checkEqual(got,expected)
+
+    def testAdjacentGrouping(self):
+        '''Test grouping of adjacent capitalized words'''
+        s = "audio-technica Number One rated"
+        s2 = "Number One rated"
+        s3 = "rated Number One"
+        s4 = "rated Number One  Worldwide"
+        expected = ["audio-technica", "Number One", "rated"]
+        expected2 = ["Number One", "rated"]
+        expected3 = ["rated", "Number One"]
+        expected4 = ["rated", "Number One  Worldwide"]
+        map(self.checkEqual,
+            map(uc.regex_word_search,[s,s2,s3,s4])
+            ,[expected,expected2,expected3,expected4])
+
+    def testAdjacentGroupingWithConnectors(self):
+        for x in [
+            ("Number One the Groupen",["Number One the Groupen"]),
+            ("the United States of America Hammer", 
+             ["the","United States of America Hammer"]),
+            ("United States of America the", ["United States of America","the"]),
+            ("United States of, America", ["United States","of","America"]),
+            ("Not one Connector", ["Not","one","Connector"]),
+            ("the United of the Front, Ace", ["the","United of the Front", "Ace"]),
+            ("the United of the, Front, Ace", 
+             ["the","United","of", "the", "Front", "Ace"]),
+            ("Not ar Connector", ["Not", "ar", "Connector"])
+            ]:
+            r = uc.regex_word_search(x[0])
+            self.checkEqual(r,x[1])
 
     def checkEqual(self,got,expected):
         self.assertEqual(got, expected, 

@@ -103,11 +103,11 @@ def regex_word_search_help(text):
 def regex_word_search(text):
   '''Maintain old name for compatibility with test cases'''
   result_set,matchidx = regex_word_search_help(text)
-  return normalize_text(result_set, matchidx)[0]
+  return normalize_text(result_set, matchidx, text)[0]
 
 def regex_word_search_idx(text):
   result_set,matchidx = regex_word_search_help(text)
-  return normalize_text(result_set, matchidx)
+  return normalize_text(result_set, matchidx, text)
 
 def count_newline(seperation):
   '''Return the number of new lines in string "seperation".
@@ -125,7 +125,7 @@ def adjacent_connector(word):
   be treated as a "word". Return True if the word under examination counts as
   one of these words.'''
 
-  connector_words = ["the","and","a"]
+  connector_words = ["the","a","of"]
   if word in connector_words: return True
   return False
 
@@ -153,7 +153,7 @@ individually to the list of seen words.'''
     new_matchidx.append(idx)
   del(connectors[0:])
 
-def normalize_text(result_set, matchidx):
+def normalize_text(result_set, matchidx, text):
     '''Run text normalization on extracted words from text.
     this text normalization turns adjacent capitalized words
     as single words, replaces known unicode apostropheses with
@@ -179,8 +179,8 @@ def normalize_text(result_set, matchidx):
     for word,matchidx in zip(result_set,matchidx):
       if word[0].isupper():
         if lastword and connectors:
-
-          seperation = text[connector[-1][1]:matchidx[0]]
+          con,idx = connectors[len(connectors)-1]
+          seperation = text[idx[1]:matchidx[0]]
 
           if not seperation.isspace():
             cancel_non_adjacent_link(new_set, new_matchidx, 
@@ -189,14 +189,14 @@ def normalize_text(result_set, matchidx):
             lastidx = matchidx
 
           else:
-            connectors.append(word,matchidx)
+            connectors.append( (word,matchidx) )
             for w,idx in connectors:
               sep = text[lastidx[1]:idx[0]]
               lastword = lastword + sep + w
               lastidx = lastidx[0],idx[1]
             connectors = []
             
-        if lastword:
+        elif lastword:
           seperation = text[lastidx[1]:matchidx[0]]
           
           #If the line count is greater than two then we may be dealing with
@@ -238,7 +238,8 @@ def normalize_text(result_set, matchidx):
         if not connectors: 
           seperation = text[lastidx[1]:matchidx[0]]
         else:
-          seperation = text[connector[-1][1]:matchidx[0]]
+          con,idx = connectors[len(connectors)-1]
+          seperation = text[idx[1]:matchidx[0]]
 
         connectors.append( (word,matchidx) )
         if not seperation.isspace():
@@ -256,6 +257,8 @@ def normalize_text(result_set, matchidx):
         new_set.append(word)
         new_matchidx.append(matchidx)
     if lastword: 
+      #This function is also called here to add lastword if it exists.
+      #i.e it is called when no cancellation occurs in this case.
       cancel_non_adjacent_link(new_set, new_matchidx, 
                                connectors, lastword, lastidx)
     result_set = new_set
