@@ -4,7 +4,7 @@ import sys
 import os 
 import codecs
 
-DICT='/usr/share/dict/words'
+DICT='dict/words'
 
 #Don't split punctuation.
 APOSTROPHES = u"’'"
@@ -84,6 +84,8 @@ def processHyphenatedToken(ht,firstIdx,wordlist):
   return True   
 
 def regex_word_search_help(text):
+  '''Extract words and the their positions out of the input text.
+  return a list of the extracted words and a list of their positions'''
 
   match = None
   match = WORD_PAT.search(text)
@@ -99,9 +101,64 @@ def regex_word_search_help(text):
   return result_set,matchidx
 
 def regex_word_search(text):
-        
-    #result_set = WORD_PAT.findall(text)
-    result_set,matchidx = regex_word_search_help(text)
+  '''Maintain old name for compatibility with test cases'''
+  result_set,matchidx = regex_word_search_help(text)
+  return normalize_text(result_set, matchidx)[0]
+
+def regex_word_search_idx(text):
+  result_set,matchidx = regex_word_search_help(text)
+  return normalize_text(result_set, matchidx)
+
+def count_newline(seperation):
+  '''Return the number of new lines in string "seperation".
+  It is assumed that only a single type of new line is present.
+  I.e windows new lines or linux new lines.'''
+  return max(seperation.count('\n'),
+             seperation.count('\r\n'),
+             seperation.count('\n\r'),
+             seperation.count('\r'))
+
+def adjacent_connector(word):
+  '''Sometimes adjacent capitalized words will be connected with a word that
+  is not capitialized. For instance, "If You Are the One" is a television
+  show from China. "the" is not capitalized but the entire name should still
+  be treated as a "word". Return True if the word under examination counts as
+  one of these words.'''
+
+  connector_words = ["the","and","a"]
+  if word in connector_words: return True
+  return False
+
+def cancel_non_adjacent_link(new_set, new_matchidx, connectors, lastword, lastidx):
+
+  '''During normalization adjacent capitalized words are transformed
+into single "words".  Adjacent capitalized words that are seperated by
+non capitalized connector words (see adjacent_connector()) are also
+transformed into single "words". If however, while parsing, it happens
+that two adjacent capitalized words cannot be connected then this
+function is called and the connection process is cancelled. What this
+means practically is that any previous words that were in limbo,
+waiting to be reduced into a single word, are instead added
+individually to the list of seen words.'''
+
+  #Add the last seen capitalized word. It won't be concatenated with any further
+  #input.
+  new_set.append(lastword) 
+  new_matchidx.append(lastidx)
+  
+  #each connector word is added too since they never got a chance to link
+  #capitalized words.
+  for w,idx in connectors:
+    new_set.append(w)
+    new_matchidx.append(idx)
+  del(connectors[0:])
+
+def normalize_text(result_set, matchidx):
+    '''Run text normalization on extracted words from text.
+    this text normalization turns adjacent capitalized words
+    as single words, replaces known unicode apostropheses with
+    ascii ones. Returns list of normalized words as well as their
+    positions in input text. Retval is a tuple.'''    
     
     #Normalize text here.
     #p.s it might be useful to take a look at the unicodedata module,
@@ -110,41 +167,112 @@ def regex_word_search(text):
     #create a new set but with adjacent upper case words treated as a single
     #word. So "new york" while in the original set is represented as two words
     #new and york, this transform the two into a single word "new york".
+    #also take into account adjacent upper case words that may be connected
+    #by non capitalized words such as "United States of America" 
 
-    lastword = None
-    lastidx = None
-    new_set = []
+    lastword = None # last capitalized word seen
+    lastidx = None # index of last capitalized word seen
+    new_set = [] #result set of words after normalization
+    new_matchidx = [] #index of these words
+    connectors = [] # buffer for holding connecting words: see adjacent_connector()
+
     for word,matchidx in zip(result_set,matchidx):
       if word[0].isupper():
+        if lastword and connectors:
+
+          seperation = text[connector[-1][1]:matchidx[0]]
+
+          if not seperation.isspace():
+            cancel_non_adjacent_link(new_set, new_matchidx, 
+                                     connectors, lastword, lastidx)
+            lastword = word
+            lastidx = matchidx
+
+          else:
+            connectors.append(word,matchidx)
+            for w,idx in connectors:
+              sep = text[lastidx[1]:idx[0]]
+              lastword = lastword + sep + w
+              lastidx = lastidx[0],idx[1]
+            connectors = []
+            
         if lastword:
           seperation = text[lastidx[1]:matchidx[0]]
-          if seperation.isspace():
+          
+          #If the line count is greater than two then we may be dealing with
+          #a quotation instead of two adjacent captialized words separated by
+          #line breaks.
+          #e.g
+          #"So sayeth I" - Historial Figure
+          #
+          #This was the historial quotation of note by...
+          #
+          #v.s 
+          #
+          #If you ever happen to be in New
+          #York for the chirstmas, it is very beautiful.
+          #
+          #Without the seperation count of 2, the first example will yield
+          #a word "Historial Figure\n\nThis". In the second example
+          #The word "New York" is still captured. This doesn't prevent
+          #"Historial Figure\nThis" from being captured if it was only a
+          #single line separation however...
+
+          if seperation.isspace() and count_newline(seperation) < 2:
             lastword = lastword + seperation + word
-            lastidx = matchidx
-          else:
+            lastidx = lastidx[0],matchidx[1]
+          else: 
             new_set.append(lastword)
-            new_set.append(word)
-            lastword = None
+            new_matchidx.append(lastidx)
+            lastword = word
+            lastidx = matchidx
         else: 
           lastword = word
           lastidx = matchidx
-      else:
-        if lastword: 
-          new_set.append(lastword)
+      
+      #case Found previous capitalized word and zero or more previous connectors
+      elif lastword and adjacent_connector(word): 
+
+        #only white space is allowed between the Capitalized words,
+        #their connectors, and connectors and connectors.
+        if not connectors: 
+          seperation = text[lastidx[1]:matchidx[0]]
+        else:
+          seperation = text[connector[-1][1]:matchidx[0]]
+
+        connectors.append( (word,matchidx) )
+        if not seperation.isspace():
+          #Looking at something like "Cake, and" or "Cake and, the" so add all
+          cancel_non_adjacent_link(new_set, new_matchidx, 
+                                   connectors, lastword, lastidx)
           lastword = None
+
+      else:
+        if lastword:
+          cancel_non_adjacent_link(new_set, new_matchidx, 
+                                   connectors, lastword, lastidx)
+          lastword = None
+        
         new_set.append(word)
-    if lastword: new_set.append(lastword)
+        new_matchidx.append(matchidx)
+    if lastword: 
+      cancel_non_adjacent_link(new_set, new_matchidx, 
+                               connectors, lastword, lastidx)
     result_set = new_set
 
-    def normalize_text(word):
-        '''turn words to lowercase, convert apostrophes'''
-        word = word.lower()
-        pat = "[%s]" % APOSTROPHES
-        word = re.sub(pat,"'", word)
-        return word
-        
-    return map(normalize_text, result_set)
-
+    #strip off "'s" from words.
+    temp1 = [] 
+    temp2 = []
+    for word,idx in zip(result_set,new_matchidx):
+      if re.match('[%s]s' % APOSTROPHES, word[-2:]):
+          word =  word[:-2]
+          temp2.append((idx[0],idx[1]-2))
+      else:
+        temp2.append(idx)
+      pat = "[%s]" % APOSTROPHES
+      word = re.sub(pat,"'", word)
+      temp1.append(word)
+    return temp1,temp2
         
 def load_words(dict):
     '''Load a dictionary at location "dict.
@@ -168,8 +296,138 @@ def word_in_dictionary(word, dict):
     except UnicodeWarning:
         print "WARNING: " + word
 
- 
+
+def printoutput_and_colorize(dict,text,isHTML):
+  '''Output input text but with unrecognized words highlighted.  Console or HTML.
+
+  There is a bug that sometimes highlights the empty space at the end
+  of an output line. I do not know what causes this. Even creating a
+  text file and placing the escape color codes in by hand will cause
+  this same error. I tried viewing a manually created file with
+  konsole, gnome terminal and xterm which all replicated the
+  problem. The width of the window also seems to play a role in
+  termining whether this bug shows up. I viewed the file by catting it.
+  
+  Viewing the output of this program with 'less -R' works properly though
+  so it is probably a bug somewhere in whatever display mechanism konsole,
+  gnome terminal and xterm share.
+  
+  '''
+
+  words,idxs = regex_word_search_idx(text)
+  unknown_word_idx = []
+  unknown_word_set = set()
+  for word,idx in zip(words,idxs):
+        if word.isdigit(): continue #skip digits
+
+        hidx = word.find('-')
+        if hidx == -1 :
+            if not word_in_dictionary(word.lower(),dict):
+              unknown_word_idx.append(idx)
+              unknown_word_set.add(word)
+        elif not processHyphenatedToken(word.lower(),hidx,dict):
+          unknown_word_idx.append(idx)
+          unknown_word_set.add(word)
+
+  #Highlight unknown words 
+
+  if isHTML:
+    delim_begin = '<span class="unknownword">'
+    delim_end = '</span>'
+  else:
+    #See more ANSI color codes here: 
+    #http://pueblo.sourceforge.net/doc/manual/ansi_color_codes.html
+    delim_begin = "\x1b[42m"
+    delim_end = "\x1b[0m"
+
+
+  '''Force output to be in utf-8. On certain systems, including mine
+  the default encoding reported by 'sys.getdefaultencoding()' is ascii.
+  What this means is that if you redirect the output of this program
+  into a file it will attempt to first convert the output into ascii and
+  will crash. Instead, create byte strings and save these. 
+  See: http://bugs.python.org/issue4947 for a possible relation?'''
+
+  buf = []
+  def output(offset,uwidx_iter):
+    try: start,end = uwidx_iter.next()
+    except StopIteration: 
+      buf.append(text[offset:].encode('utf-8'))
+      return
+    buf.append(text[offset:start].encode('utf-8'))
+    buf.append(delim_begin)
+    buf.append(text[start:end].encode('utf-8'))
+    buf.append(delim_end)
+    output(end,uwidx_iter)
+
+  output(0,iter(unknown_word_idx))
+
+  stat = 'Unrecognized unique words / unique Words (%d/%d): Percent %f' 
+  word_set = set(words)
+  percentage = (float(len(unknown_word_set)) / len(word_set)) * 100
+
+  stat = stat % (len(unknown_word_set),len(word_set), percentage)
+
+  if isHTML:
+    return generate_html() % (stat,''.join(buf))
+  else:
+    buf.append(os.linesep)
+    buf.append(stat)
+    return ''.join(buf)
+
+def generate_html():
+  '''Generate html output'''
+  return '''
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    
+    <style type="text/css">
+      pre { 
+        margin: auto;
+        width:80em; /*width is 80 chars*/
+        padding: 10px;
+        border-width: thin;
+        border-style: solid;
+        border-color: black;
+      }
+      #stat { 
+        margin-top:10px;
+        margin-bottom:10px;
+        text-align:center;
+      }
+      #doc {
+        white-space: pre-wrap;
+        overflow:hidden;
+      }
+      .unknownword {
+        background: #ffff00;
+      }
+    </style>
+
+    <link type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/start/jquery-ui.css" rel="stylesheet"/> 
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
+    <script type="text/javascript">
+      $(function(){
+        $("#doc").resizable({animate:true});
+      });
+    </script>
+
+  </head>
+  <body>
+    <pre id="stat">%s</pre>
+    <pre id="doc">%s</pre>
+  </body>
+</html>'''
+
+def html_output(text):
+  '''Return html output with unknown words are highlighted.'''
+  dict = load_words(DICT)
+  return printoutput_and_colorize(dict,text,isHTML=True)
+
 if __name__ == '__main__':
+    '''Script called manually, print output to the terminal'''
     if len(sys.argv) < 2:
         print 'usage: uc.py textfile'
         sys.exit(1)
@@ -179,16 +437,6 @@ if __name__ == '__main__':
     textf.close()
 
     dict = load_words(DICT)
-    words = regex_word_search(text)
-    for word in words:
-        if word.isdigit(): continue #skip digits
-
-        hidx = word.find('-')
-        if hidx == -1 :
-            if not word_in_dictionary(word,dict):
-                print word
-        elif not processHyphenatedToken(word,hidx,dict):
-            print word
-      
+    print printoutput_and_colorize(dict,text,False)
     sys.exit(0)
 
