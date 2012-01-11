@@ -12,6 +12,10 @@ import com.sun.jersey.spi.container.servlet.ServletContainer;
 
 public class JettyRestExample {
 
+	/**
+	 * Add a SSL connector so https connections can be made.
+	 * @param server
+	 */
 	private static void addSSLConnector(Server server){
 		SslContextFactory sslcfact = new SslContextFactory("/tmp/keystore");
         String pass = "OBF:19iy19j019j219j419j619j8";
@@ -24,6 +28,10 @@ public class JettyRestExample {
         server.addConnector(sslConnector);
 	}
 	
+	/**
+	 * Remove the default unencrypted connector.
+	 * @param server
+	 */
 	private static void removeConnectors(Server server){
 		for(Connector c : server.getConnectors()) server.removeConnector(c);
 	}
@@ -31,16 +39,16 @@ public class JettyRestExample {
 	public static void main(String[] args) throws Exception
     {
         Server server = new Server(8080);
-        removeConnectors(server); //remove default connector
-        addSSLConnector(server); //add ssl connector
+        //removeConnectors(server); //remove default connector
+        //addSSLConnector(server); //add ssl connector
         
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
-        context.setContextPath("/wruz");
+        context.setContextPath("/");
         server.setHandler(context);
  
         context.addServlet(new ServletHolder(
         		new ServletContainer(
-        				new PackagesResourceConfig("context"))),"/frog/*");
+        				new PackagesResourceConfig("context"))),"/*");
         
         server.start();
         server.join();
