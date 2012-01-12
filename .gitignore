@@ -3,3 +3,10 @@
 
 #ignore russ' regex c code
 *c/regex/
+
+#ignore class files
+*.class
+
+#ignore jaxb jar file 
+java/jaxb-example/deps
+
