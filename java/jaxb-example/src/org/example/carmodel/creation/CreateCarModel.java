@@ -1,24 +1,34 @@
 package org.example.carmodel.creation;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.ArrayList;
 import java.util.List;
 
+import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.bind.ValidationEvent;
+import javax.xml.bind.ValidationEventHandler;
+import javax.xml.bind.ValidationEventLocator;
+import javax.xml.bind.util.ValidationEventCollector;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
+import javax.xml.validation.Schema;
+import javax.xml.validation.SchemaFactory;
 
 import org.example.carmodel.Car;
 import org.example.carmodel.Fleet;
 import org.example.carmodel.ObjectFactory;
 import org.example.carmodel.Owner;
+import org.xml.sax.SAXException;
 
 /**
  * Example class showing how to actually use the java xml/schema bindings
@@ -51,11 +61,11 @@ public class CreateCarModel{
 		c1.setOwner(o);
 		
 		Owner o2 = new Owner();
-		o.setFirstname("Owen");
-		o.setLastname("Pat");
-		o.setHeight("5'8");
-		o.setSex("male");
-		o.setWeight("168");
+		o2.setFirstname("Owen");
+		o2.setLastname("Pat");
+		o2.setHeight("5'8");
+		o2.setSex("male");
+		o2.setWeight("168");
 		
 		XMLGregorianCalendar dob2 = dtf.newXMLGregorianCalendar();
 		dob2.setYear(2043);
@@ -130,9 +140,83 @@ public class CreateCarModel{
 		}.start();
 	}
 	
-	public static void main(String args[]) throws JAXBException, DatatypeConfigurationException, IOException{
-		outputFleetXML(assembleFleet(), System.out);
-		inputFleetXML(System.out);
+	/**
+	 * Generate a java schema object based on a xsd file at location.
+	 * It is assumed the xsd uses the W3C schema definition.
+	 * @param location Filepath to xsd file
+	 * @return
+	 * @throws SAXException
+	 */
+	static Schema getCarModelSchema(String location) throws SAXException{
 		
+		SchemaFactory sf = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+		Schema carmodelSchema = sf.newSchema(new File(location));
+		return carmodelSchema;
+	}
+	
+	
+	private static class ValidationEventAllCollector implements ValidationEventHandler{
+		private List<ValidationEvent> velist = new ArrayList<ValidationEvent>();
+		
+		public boolean handleEvent(ValidationEvent e){
+			velist.add(e);
+			if(e.getSeverity() == ValidationEvent.FATAL_ERROR){
+				/*Failing to return false from the handleEvent method after encountering 
+				 * a fatal error is undefined by the specification and may
+				 *result in unexpected behavior.
+				 */
+				//So what, for practice sake lets do it anyways otherwise all errors
+				//are not being output.
+				return true;
+			}
+			return true;
+		}
+		public List<ValidationEvent> getEvents(){
+			return velist;
+		}
+	}
+	
+	static Object validateXMLAndGetTree(Schema sch, File xml) throws Throwable{
+		JAXBContext context = JAXBContext.newInstance( "org.example.carmodel" );
+		Unmarshaller um = context.createUnmarshaller();
+		ValidationEventAllCollector vec = new ValidationEventAllCollector();
+		
+		um.setSchema(sch);
+		um.setEventHandler(vec);
+		
+		Object tree = null;
+		try{um.unmarshal(xml);}
+		catch(Throwable t){;}
+		
+		Throwable lastEx = null; //Throw the last EX is there is one.
+		for(ValidationEvent ve : vec.getEvents()){
+			ValidationEventLocator vel = ve.getLocator();
+			
+			String errmessage = ve.getMessage();
+			System.out.format("Err:%s Line:%d Column:%d %n", 
+					errmessage, vel.getLineNumber(), vel.getColumnNumber());
+			lastEx = ve.getLinkedException();
+		}
+		//if (lastEx != null) throw lastEx; 
+		return tree;
+	}
+	
+	
+	/**
+	 * This example shows how a schema is validated against an error in an xml file.
+	 * @throws Throwable 
+	 */
+	static void generateValidationError() throws Throwable{
+		String schemaLocation;
+		schemaLocation = "/home/blessburn/Desktop/programming/java/jaxb-example/src/org/example/carmodel/schema/CarModel.xsd";
+		String fileLocation = "/tmp/badxml.xml";
+		validateXMLAndGetTree(getCarModelSchema(schemaLocation), new File(fileLocation));
+	}
+	
+	public static void main(String args[]) throws Throwable{
+		outputFleetXML(assembleFleet(), System.out);
+		//inputFleetXML(System.out);
+		generateValidationError();
 	}
 }
+
