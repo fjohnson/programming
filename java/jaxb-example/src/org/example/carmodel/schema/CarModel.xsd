@@ -1,13 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schema xmlns="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.example.org/CarModel" xmlns:tns="http://www.example.org/CarModel" elementFormDefault="qualified">
 
-    <element name="maxspeed" type="int"></element>
-
-    <element name="name" type="string"></element>
-
-
-
-
     <complexType name="owner">
     	<sequence>
     		<element name="lastname" type="string"></element>
@@ -17,22 +10,34 @@
         <attributeGroup ref="tns:owner_about"></attributeGroup>
     </complexType>
 
-    <element name="owner" type="tns:owner"></element>
-
-
-
-
     <attributeGroup name="owner_about">
     	<attribute name="height" type="string"></attribute>
     	<attribute name="sex" type="string"></attribute>
     	<attribute name="weight" type="string"></attribute>
     </attributeGroup>
 
-    <element name="previous_owners" type="string"></element>
-
-    <complexType name="previous_owner">
+    <complexType name="car">
     	<sequence>
-    		<element name="owner" type="tns:owner" maxOccurs="unbounded" minOccurs="0"></element>
+    		<element name="maxspeed" type="int"></element>
+    		<element name="name" type="string"></element>
+    		<element name="owner" type="tns:owner" maxOccurs="1" minOccurs="1"></element>
+    		<element name="previous_owner" type="tns:owner" maxOccurs="unbounded" minOccurs="0"></element>
     	</sequence>
     </complexType>
+
+
+    <element name="car" type="tns:car"></element>
+
+
+    <complexType name="fleet">
+    	<sequence>
+    		<element name="cars" type="tns:car" maxOccurs="unbounded"
+    			minOccurs="1">
+    		</element>
+    	</sequence>
+    	<attribute name="startyear" type="date"></attribute>
+    	<attribute name="endyear" type="date"></attribute>
+    </complexType>
+
+    <element name="fleet" type="tns:fleet"></element>
 </schema>
