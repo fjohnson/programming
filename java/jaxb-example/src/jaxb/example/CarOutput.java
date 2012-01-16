@@ -28,7 +28,7 @@ public class CarOutput {
 		System.out.println(cm.name);
 	}
 	public static void main(String[] args) throws JAXBException, FileNotFoundException {
-		SpitOutCarModelXML();
+		//SpitOutCarModelXML();
 		reconstructCarModelFromXML();
 	}
 

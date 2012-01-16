@@ -154,7 +154,10 @@ public class CreateCarModel{
 		return carmodelSchema;
 	}
 	
-	
+	/**
+	 * This is a custom ValidationEventHandler. The default ValidationEventCollector stops
+	 * reporting errors when it first encounters one. This VEH spits them all out.
+	 */
 	private static class ValidationEventAllCollector implements ValidationEventHandler{
 		private List<ValidationEvent> velist = new ArrayList<ValidationEvent>();
 		
@@ -176,6 +179,13 @@ public class CreateCarModel{
 		}
 	}
 	
+	/**
+	 * Example of validating a schema and reporting all errors found.
+	 * @param sch
+	 * @param xml
+	 * @return
+	 * @throws Throwable
+	 */
 	static Object validateXMLAndGetTree(Schema sch, File xml) throws Throwable{
 		JAXBContext context = JAXBContext.newInstance( "org.example.carmodel" );
 		Unmarshaller um = context.createUnmarshaller();

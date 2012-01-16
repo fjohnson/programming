@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.example.org/Planet" xmlns:tns="http://www.example.org/Planet" elementFormDefault="qualified">
+
+    <element name="Planet" type="tns:Planet"></element>
+    
+    <complexType name="Planet">
+    	<sequence>
+    		<element name="id" type="int"></element>
+    		
+            <element name="name" type="string"></element>
+            <element name="radius" type="double"></element>
+            
+    	</sequence>
+    </complexType>
+</schema>
