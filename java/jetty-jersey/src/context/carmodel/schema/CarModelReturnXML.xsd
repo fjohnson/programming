@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://www.example.org/CarModelReturnXML/" targetNamespace="http://www.example.org/CarModelReturnXML/" xmlns:Q1="http://www.example.org/CarModel">
+    <import schemaLocation="../../../../../jaxb-example/src/org/example/carmodel/schema/CarModel.xsd" namespace="http://www.example.org/CarModel"></import>
+    <element name="matchingCars" type="tns:cargroup"></element>
+    
+    <complexType name="cargroup">
+    	<sequence>
+    		<element name="car" type="Q1:car" maxOccurs="unbounded" minOccurs="0"></element>
+    	</sequence>
+    </complexType>
+
+    <element name="car" type="Q1:car"></element>
+</schema>

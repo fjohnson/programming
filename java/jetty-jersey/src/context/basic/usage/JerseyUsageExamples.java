@@ -1,11 +1,12 @@
 
-package context;
+package context.basic.usage;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Reader;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,7 +39,7 @@ import com.sun.jersey.multipart.FormDataMultiPart;
  */
 
 @Path("/users/")
-public class HelloWorldResource {
+public class JerseyUsageExamples {
 
    
 	/**
@@ -191,15 +192,15 @@ public class HelloWorldResource {
     }
     
     /**
-     * This example will generate an exception because... there is no 
-     * message body writer that can handle this method's signature.
-     * see table 19 for the list of possible signatures that come with
-     * MessageBodyWriters already set up.
+     * This example will generate an exception because there is no 
+     * MessageBodyWriter that knows how to write out a double as
+     * an http body. Also there are no MessageBodyReaders that know
+     * how to turn incoming data into the Date and Number parameters. 
      * @return
      */
-    @GET
+    @POST
     @Path("/exception")
-    public double getNoMessageBodyWriterException(){
+    public double getNoMessageBodyWriterException(Date a, Number b){
     	return 4.0;
     }
     

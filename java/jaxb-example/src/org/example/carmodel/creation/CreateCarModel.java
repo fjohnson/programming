@@ -218,7 +218,7 @@ public class CreateCarModel{
 	 */
 	static void generateValidationError() throws Throwable{
 		String schemaLocation;
-		schemaLocation = "/home/blessburn/Desktop/programming/java/jaxb-example/src/org/example/carmodel/schema/CarModel.xsd";
+		schemaLocation = "/home/fletcher/git/programming/java/jaxb-example/src/org/example/carmodel/schema/CarModel.xsd";
 		String fileLocation = "/tmp/badxml.xml";
 		validateXMLAndGetTree(getCarModelSchema(schemaLocation), new File(fileLocation));
 	}

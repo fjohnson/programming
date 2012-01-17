@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<car xmlns="http://www.example.org/CarModel">
+        <maxspeed>100</maxspeed>
+        <namze>Toyota</name> <!--Error-->
+        <owner height="6'1" sex="male" weight="150">
+            <lastname>Johnson</lastname>
+            <firstname>Fletcher</firstname>
+            <dob>20z2-08-15</dob> <!--Error-->
+        </owner>
+</car>

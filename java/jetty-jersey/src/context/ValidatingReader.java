@@ -4,6 +4,7 @@ package context;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.URL;
 
@@ -37,7 +38,7 @@ public class ValidatingReader implements MessageBodyReader<Planet> {
     public ValidatingReader() {
         try {
             SchemaFactory sf = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-            URL schemaURL = new URL("file:///home/blessburn/work/programming/java/jaxb-example/src/org/example/carmodel/schema/Planet.xsd");
+            URL schemaURL = new URL("file:///home/fletcher/git/programming/java/jaxb-example/src/org/example/carmodel/schema/Planet.xsd");
             sf.newSchema(schemaURL);
         } catch(Exception e) {
         	
@@ -45,8 +46,19 @@ public class ValidatingReader implements MessageBodyReader<Planet> {
         }
     }
 
+    
     public boolean isReadable(Class<?> arg0, Type arg1, Annotation[] arg2, MediaType arg3) {
-        return arg0 == Planet.class; 
+    	if(arg1 instanceof ParameterizedType){
+    		ParameterizedType pt = (ParameterizedType) arg1;
+    		
+    		for(Type t : pt.getActualTypeArguments()){
+    			//In this case t is an instance of Class.
+    			if(t.equals(Planet.class)){
+    				return true;
+    			}
+    		}
+    	}
+    	return false;
     }
 
     public Planet readFrom(Class<Planet> arg0, Type arg1, Annotation[] arg2, MediaType arg3, MultivaluedMap<String, String> arg4, InputStream arg5)

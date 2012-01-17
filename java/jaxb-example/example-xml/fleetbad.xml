@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<fleet xmlns="http://www.example.org/CarModel">
+    <cars>
+        <maxspeed>1r0</maxspeed> <!-- Error -->
+        <name>Toyota</name>
+        <owner height="6'1" sex="male" weight="150">
+            <lastname>Johnson</lastname>
+            <firstname>Fletcher</firstname>
+            <dob>2052-08-15</dob>
+        </owner>
+    </cars>
+    <carz> <!-- Error -->
+        <maxspeed>200</maxspeed>
+        <name>Honda</name>
+        <owner height="5'8" sex="male" weight="168">
+            <lastname>Pat</lastname>
+            <firstname>Owen</firstname>
+            <dob>2043-04-12</dob>
+        </owner>
+    </cars>
+</fleet>
