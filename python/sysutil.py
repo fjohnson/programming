@@ -36,9 +36,25 @@ def eproc(*args,**kwargs):
     try: stderr = kwargs['stderr']
     except KeyError: stderr = PIPE
 
-    proc = Popen(list(args),
-                 stdout=stdout,
-                 stderr=stderr)
+    try: proc = Popen(list(args),
+                      stdout=stdout,
+                      stderr=stderr)
+    except OSError as e:
+        import errno
+        
+        #Only handle No such file or directory error
+        if e.errno != errno.ENOENT:
+            raise e
+                
+        if not 'PATH' in os.environ:
+            msg = 'Could not find executable %s. PATH is not set.' % args[0]
+            sys.stderr.write(msg + os.linesep)
+            raise e
+        msg = 'Could not find executable %s.' % args[0]
+        msg2 = os.linesep + 'PATH is %s' % os.environ['PATH']
+        sys.stderr.write(msg + msg2 + os.linesep)
+        raise e
+
 
     #ret will be a tuple (None,None) if stdout!=PIPE and stderr!=PIPE
     ret = proc.communicate()
