@@ -1,6 +1,8 @@
 import os
 import sys
 import re
+import xml.dom.minidom
+import xml.parsers.expat
 from subprocess import call, Popen, PIPE
 from fcntl import flock, LOCK_EX, LOCK_UN
 
@@ -69,9 +71,75 @@ def releaseFileLock(lock):
     '''Release a file "lock" locked with getFileExclusiveLock()'''
     flock(lock,LOCK_UN)
 
+def getXmlRoot(xmlfile):
+    '''Open `xmlfile' and return a DOM. False if parsing fails.'''
+    try:
+        param_xml = xml.dom.minidom.parse(xmlfile)
+    except xml.parsers.expat.ExpatError as e:
+        sys.stderr.write("ExpatError while parsing line: %d col: %d%s" 
+                          % (e.lineno, e.offset, os.linesep))
+        sys.stderr.write(xml.parsers.expat.ErrorString(e.code) + os.linesep)
+        sys.stderr.write("The %s file is not valid XML.%n" + (xmlfile,os.linesep))
+        return False
+    except: 
+        #The documentation available does not actually say that xml.dom.minidom.parse
+        #will use the Expat parser. Thus it is possible that another parser may be used
+        #in the future and so I am accounting for that here. I got an Expat error when
+        #attempting to parse an empty xml file.
+        sys.stderr.write("Unknown exception. Error while parsing %s" %xmlfile)
+        sys.stderr.write(os.linesep)
+        raise #reraise caught exception. parsing failed.
+    
+    #If there is no document element (root element) the parser should
+    #have thrown an error. I was getting an ExpatError when I was
+    #trying to parse a blank document with xml.dom.minidom.parse
+    #For other parsers... I don't know.
+    
+    childNodes = param_xml.documentElement.childNodes
+    
+    #The root element of the parameters xml file did not contain
+    #any elements. Strange.
+    if not childNodes:
+        return False 
+    return param_xml
 
+class xmlTextNodeParseException(Exception): pass
+class noChildNodesException(xmlTextNodeParseException): pass
 
-
+def getXmlNodeText(node):
+    '''Extract the text out of a node element.
+    A node element looks something like this: 
+    <tvb:bgthresh>100</tvb:bgthresh>
+    It is assumed it will not contain any xml mark up and therefore should 
+    only contain a single xml.dom.Node.TEXT_NODE object.
+    
+    Input: node -> An ELEMENT_NODE
+    Output: the .nodeValue of node's single TEXT_NODE stripped of white space.
+    '''
+    
+    #Node must be an element type node.
+    if node.nodeType != node.ELEMENT_NODE: 
+        msg = "Input node type does not match node.ELEMENT_NODE"
+        raise xmlTextNodeParseException(msg)
+    
+    #No child nodes means its an empty element. Bad.
+    if not node.childNodes: 
+        msg = "Input node contains no child nodes. Expecting a TEXT_NODE."
+        raise noChildNodesException(msg)
+    
+    #balk if there is more than one text node. see assumption above in doc string.
+    textnodes = filter(lambda n : n.nodeType == n.TEXT_NODE, node.childNodes)
+    
+    if len(textnodes) > 1:
+        
+        #Dumb error message but... 
+        msg = ("While I was parsing <%s> I encountered two " % node.tagName + 
+        " or more separate sections of text. An xml element " + 
+        "is used to separate text. " + os.linesep + 
+        "Did you insert one into the parameters by mistake?" + 
+        os.linesep)
+        raise xmlTextNodeParseException(msg) 
+    return textnodes[0].nodeValue.strip()
 
     
 
